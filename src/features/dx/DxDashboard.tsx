@@ -1,12 +1,9 @@
-import dataJson from "@/data/dashboard.json";
 import { ProgressBar } from "@/components/ProgressBar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatPercent } from "@/lib/format";
 import type { DashboardData } from "@/lib/types";
 
-const data = dataJson as DashboardData;
-
-export function DxDashboard() {
+export function DxDashboard({ data }: { data: DashboardData }) {
   const average = data.dx.length ? data.dx.reduce((sum, x) => sum + x.progress, 0) / data.dx.length : 0;
   return (
     <div className="page">

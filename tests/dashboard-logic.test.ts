@@ -3,6 +3,9 @@ import dataJson from "../src/data/dashboard.json";
 import {
   actionTiming,
   calculateOverview,
+  getDataReadiness,
+  getFacilitySummaries,
+  getFreshness,
   priceStage,
 } from "../src/lib/dashboard";
 import type { ActionItem, DashboardData } from "../src/lib/types";
@@ -37,5 +40,49 @@ describe("dashboard domain logic", () => {
     expect(priceStage(0.5, t)).toBe("基本販売");
     expect(priceStage(0.85, t)).toBe("割引停止");
     expect(priceStage(0.9, t)).toBe("プレミアム価格検討");
+  });
+
+  it("reports the seven operational readiness domains without inventing data", () => {
+    const readiness = getDataReadiness(data);
+    expect(readiness.totalCount).toBe(7);
+    expect(readiness.domains.map((item) => item.key)).toEqual([
+      "booking",
+      "revenue",
+      "courseQuality",
+      "workforce",
+      "pricing",
+      "investment",
+      "owners",
+    ]);
+    expect(readiness.missingCount).toBe(7);
+  });
+
+  it("uses the documented freshness bands", () => {
+    const sameDay = getFreshness(data);
+    expect(sameDay.level).toBe("最新");
+    expect(sameDay.daysOld).toBe(0);
+
+    const fourDaysOld = getFreshness({
+      ...data,
+      meta: { ...data.meta, asOfDate: "2026-09-22" },
+    });
+    expect(fourDaysOld.level).toBe("要確認");
+
+    const eightDaysOld = getFreshness({
+      ...data,
+      meta: { ...data.meta, asOfDate: "2026-09-26" },
+    });
+    expect(eightDaysOld.level).toBe("更新推奨");
+  });
+
+  it("builds facility summaries for the three operating facilities", () => {
+    const summaries = getFacilitySummaries(data);
+    expect(summaries.map((item) => item.facility)).toEqual([
+      "真駒内CC",
+      "滝のCC",
+      "羊ヶ丘CC",
+    ]);
+    expect(summaries.find((item) => item.facility === "滝のCC")?.unsetPriceCount).toBe(2);
+    expect(summaries.every((item) => item.hasActuals === false)).toBe(true);
   });
 });

@@ -2,6 +2,9 @@ import type {
   ActionItem,
   BookingThresholds,
   DashboardData,
+  DataReadinessSummary,
+  FacilitySummary,
+  FreshnessSummary,
   OverviewMetrics,
   RevenueRow,
 } from "./types";
@@ -36,7 +39,144 @@ export function priceStage(
 }
 
 export function hasRevenueActuals(rows: RevenueRow[]): boolean {
-  return rows.some((row) => row.actualRevenue !== null || row.actualPlayers !== null || row.actualAvgPrice !== null);
+  return rows.some(
+    (row) =>
+      row.actualRevenue !== null ||
+      row.actualPlayers !== null ||
+      row.actualAvgPrice !== null,
+  );
+}
+
+export function getDataReadiness(data: DashboardData): DataReadinessSummary {
+  const bookingReady = data.revenue.some(
+    (row) => row.capacitySlots !== null && row.bookedSlots !== null,
+  );
+  const revenueReady = hasRevenueActuals(data.revenue);
+  const courseReady = data.courseQuality.length > 0;
+  const workforceReady = data.workforce.length > 0;
+  const pricingReady = data.prices.every(
+    (row) => row.weekdayPrice !== null && row.weekendPrice !== null,
+  );
+  const priorityInvestments = data.investments.filter(
+    (item) => item.priority === "最優先" || item.priority === "高",
+  );
+  const investmentReady =
+    priorityInvestments.length > 0 &&
+    priorityInvestments.every((item) => item.estimatedCost !== null);
+  const ownersReady = [...data.actions, ...data.dx].every(
+    (item) => !item.owner.includes("要調整"),
+  );
+
+  const domains = [
+    {
+      key: "booking" as const,
+      label: "予約枠",
+      ready: bookingReady,
+      detail: bookingReady ? "予約率を算出可能" : "販売可能枠・予約済枠が未入力",
+      href: "/revenue",
+    },
+    {
+      key: "revenue" as const,
+      label: "売上実績",
+      ready: revenueReady,
+      detail: revenueReady ? "実績KPIを算出可能" : "実績人数・単価・売上が未入力",
+      href: "/revenue",
+    },
+    {
+      key: "courseQuality" as const,
+      label: "コース品質",
+      ready: courseReady,
+      detail: courseReady ? "測定値あり" : "3コース共通KPIの実測値が未入力",
+      href: "/course-quality",
+    },
+    {
+      key: "workforce" as const,
+      label: "労務実績",
+      ready: workforceReady,
+      detail: workforceReady ? "労務KPIを算出可能" : "残業・実働等が未入力",
+      href: "/workforce",
+    },
+    {
+      key: "pricing" as const,
+      label: "料金確定",
+      ready: pricingReady,
+      detail: pricingReady ? "全料金が設定済み" : "未確定のコース料金あり",
+      href: "/revenue",
+    },
+    {
+      key: "investment" as const,
+      label: "投資額",
+      ready: investmentReady,
+      detail: investmentReady ? "高優先度案件の概算あり" : "高優先度案件に未見積あり",
+      href: "/roi",
+    },
+    {
+      key: "owners" as const,
+      label: "責任者",
+      ready: ownersReady,
+      detail: ownersReady ? "責任者設定済み" : "要調整の責任者あり",
+      href: "/actions",
+    },
+  ];
+
+  const readyCount = domains.filter((domain) => domain.ready).length;
+
+  return {
+    readyCount,
+    missingCount: domains.length - readyCount,
+    totalCount: domains.length,
+    domains,
+  };
+}
+
+export function getFreshness(data: DashboardData): FreshnessSummary {
+  const asOf = parseDate(data.meta.asOfDate).getTime();
+  const source = parseDate(data.meta.sourceUpdatedAt).getTime();
+  const oneDay = 24 * 60 * 60 * 1000;
+  const daysOld = Math.max(0, Math.floor((asOf - source) / oneDay));
+
+  const level = daysOld <= 3 ? "最新" : daysOld <= 7 ? "要確認" : "更新推奨";
+  const message =
+    level === "最新"
+      ? "基準日に対して新しいスナップショットです"
+      : level === "要確認"
+        ? "更新から4日以上経過しています"
+        : "更新から8日以上経過しています";
+
+  return {
+    daysOld,
+    level,
+    sourceUpdatedAt: data.meta.sourceUpdatedAt,
+    message,
+  };
+}
+
+export function getFacilitySummaries(data: DashboardData): FacilitySummary[] {
+  const facilities: FacilitySummary["facility"][] = ["真駒内CC", "滝のCC", "羊ヶ丘CC"];
+
+  return facilities.map((facility) => {
+    const pricePositions = data.prices.filter((item) => item.facility === facility);
+    const revenueRows = data.revenue.filter((item) => item.facility === facility);
+    const unsetPriceCount = pricePositions.reduce(
+      (count, item) =>
+        count +
+        (item.weekdayPrice === null ? 1 : 0) +
+        (item.weekendPrice === null ? 1 : 0),
+      0,
+    );
+    const bookingInputRows = revenueRows.filter(
+      (item) => item.capacitySlots !== null && item.bookedSlots !== null,
+    ).length;
+
+    return {
+      facility,
+      pricePositions,
+      unsetPriceCount,
+      bookingInputRows,
+      revenueRows: revenueRows.length,
+      hasActuals: hasRevenueActuals(revenueRows),
+    };
+  });
 }
 
 export function calculateOverview(data: DashboardData): OverviewMetrics {
@@ -47,10 +187,13 @@ export function calculateOverview(data: DashboardData): OverviewMetrics {
     .map((row) => row.actualRevenue)
     .filter((value): value is number => value !== null);
 
+  const plannedRevenue = plannedRevenueValues.reduce((sum, value) => sum + value, 0);
+  const actualRevenue = actualRevenueValues.reduce((sum, value) => sum + value, 0);
   const revenueAchievement =
-    plannedRevenueValues.length > 0 && actualRevenueValues.length > 0
-      ? actualRevenueValues.reduce((sum, value) => sum + value, 0) /
-        plannedRevenueValues.reduce((sum, value) => sum + value, 0)
+    plannedRevenueValues.length > 0 &&
+    actualRevenueValues.length > 0 &&
+    plannedRevenue > 0
+      ? actualRevenue / plannedRevenue
       : null;
 
   const capacity = data.revenue
@@ -70,7 +213,6 @@ export function calculateOverview(data: DashboardData): OverviewMetrics {
     .map((row) => row.actualPlayers)
     .filter((value): value is number => value !== null)
     .reduce((sum, value) => sum + value, 0);
-  const actualRevenue = actualRevenueValues.reduce((sum, value) => sum + value, 0);
   const actualAvgPrice = actualPlayers > 0 ? actualRevenue / actualPlayers : null;
 
   const weakGreenCount =
@@ -128,9 +270,11 @@ export function sortActionsByUrgency(actions: ActionItem[], asOfDate: string): A
   };
 
   return [...actions].sort((a, b) => {
-    const timingDiff = timingRank[actionTiming(a, asOfDate)] - timingRank[actionTiming(b, asOfDate)];
+    const timingDiff =
+      timingRank[actionTiming(a, asOfDate)] - timingRank[actionTiming(b, asOfDate)];
     if (timingDiff !== 0) return timingDiff;
-    const priorityDiff = (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9);
+    const priorityDiff =
+      (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9);
     if (priorityDiff !== 0) return priorityDiff;
     return (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
   });
