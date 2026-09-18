@@ -195,3 +195,45 @@ export interface OverviewMetrics {
   overdueActions: number;
   actionCompletionRate: number | null;
 }
+
+export type ReadinessKey =
+  | "booking"
+  | "revenue"
+  | "courseQuality"
+  | "workforce"
+  | "pricing"
+  | "investment"
+  | "owners";
+
+export interface ReadinessDomain {
+  key: ReadinessKey;
+  label: string;
+  ready: boolean;
+  detail: string;
+  href: string;
+}
+
+export interface DataReadinessSummary {
+  readyCount: number;
+  missingCount: number;
+  totalCount: number;
+  domains: ReadinessDomain[];
+}
+
+export type FreshnessLevel = "最新" | "要確認" | "更新推奨";
+
+export interface FreshnessSummary {
+  daysOld: number;
+  level: FreshnessLevel;
+  sourceUpdatedAt: string;
+  message: string;
+}
+
+export interface FacilitySummary {
+  facility: "真駒内CC" | "滝のCC" | "羊ヶ丘CC";
+  pricePositions: PricePosition[];
+  unsetPriceCount: number;
+  bookingInputRows: number;
+  revenueRows: number;
+  hasActuals: boolean;
+}

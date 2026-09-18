@@ -1,15 +1,12 @@
-import dataJson from "@/data/dashboard.json";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import type { DashboardData } from "@/lib/types";
-
-const data = dataJson as DashboardData;
 
 function ImpactScore({ label, value }: { label: string; value: number }) {
   return <div className="score-row"><span>{label}</span><div className="score-track"><div className="score-fill" style={{ width: `${value * 20}%` }} /></div><strong>{value}/5</strong></div>;
 }
 
-export function RoiDashboard() {
+export function RoiDashboard({ data }: { data: DashboardData }) {
   return (
     <div className="page">
       <header className="page-header">

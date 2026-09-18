@@ -1,13 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import dataJson from "@/data/dashboard.json";
 import { EmptyState } from "@/components/EmptyState";
 import { FilterBar } from "@/components/FilterBar";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { DashboardData } from "@/lib/types";
-
-const data = dataJson as DashboardData;
 
 const indicators = [
   ["植物", "芝密度、根長、越冬率、病害症状"],
@@ -16,7 +13,7 @@ const indicators = [
   ["作業", "散水時間、薬剤・肥料費、更新作業時間"],
 ];
 
-export function CourseQualityDashboard() {
+export function CourseQualityDashboard({ data }: { data: DashboardData }) {
   const [facility, setFacility] = useState("all");
   const [month, setMonth] = useState("all");
   const filtered = useMemo(() => data.courseQuality.filter((row) => {
@@ -25,7 +22,7 @@ export function CourseQualityDashboard() {
       return Number(row.date.slice(5, 7)) === Number(month);
     }
     return month === "all";
-  }), [facility, month]);
+  }), [data, facility, month]);
 
   return (
     <div className="page">
@@ -39,7 +36,7 @@ export function CourseQualityDashboard() {
 
       <section className="section">
         <div className="section__header"><div><h2>3コース共通指標</h2><p>2026年秋から現状データ取得を開始する前提</p></div></div>
-        <div className="section__body three-col">
+        <div className="section__body indicator-grid">
           {indicators.map(([title, description]) => (
             <article className="list-card" key={title}>
               <h3>{title}</h3>

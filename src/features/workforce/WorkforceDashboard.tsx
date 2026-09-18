@@ -1,21 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import dataJson from "@/data/dashboard.json";
 import { EmptyState } from "@/components/EmptyState";
 import { FilterBar } from "@/components/FilterBar";
 import type { DashboardData } from "@/lib/types";
 
-const data = dataJson as DashboardData;
-
-export function WorkforceDashboard() {
+export function WorkforceDashboard({ data }: { data: DashboardData }) {
   const [facility, setFacility] = useState("all");
   const [month, setMonth] = useState("all");
   const filtered = useMemo(() => data.workforce.filter((row) => {
     if (facility !== "all" && row.facility !== facility) return false;
     if (month !== "all" && row.date) return Number(row.date.slice(5, 7)) === Number(month);
     return month === "all";
-  }), [facility, month]);
+  }), [data, facility, month]);
 
   return (
     <div className="page">
