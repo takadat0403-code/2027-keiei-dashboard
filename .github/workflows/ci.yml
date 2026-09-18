@@ -20,8 +20,14 @@ jobs:
         run: pip install -r requirements.txt
       - name: Install Node dependencies
         run: npm install
-      - name: Regenerate dashboard data
-        run: npm run data:sync
+      - name: Regenerate dashboard data when workbook is present
+        shell: bash
+        run: |
+          if [ -f "data/source/2027年度_経営改革ダッシュボード_土台.xlsx" ]; then
+            npm run data:sync
+          else
+            echo "Source workbook is not committed; using checked-in src/data/dashboard.json"
+          fi
       - name: Test
         run: npm test
       - name: Typecheck
